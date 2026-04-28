@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>星火 · 胜利 - 金色星尘幼苗生长版</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <style>
+        body { margin: 0; background: #030100; color: white; overflow: hidden; font-family: "Microsoft YaHei", sans-serif; touch-action: none; }
+        
+        #webgl-container { position: absolute; width: 100vw; height: 100vh; top:0; left:0; z-index: 1; pointer-events: auto; }
+
+        #ui-layer {
+            position: absolute; top: 6%; width: 100%; text-align: center; z-index: 10; pointer-events: none;
+        }
+        h1 { font-size: 34px; color: #ffcc00; letter-spacing: 12px; text-shadow: 0 0 25px rgba(255, 150, 0, 0.9); font-weight: bold; margin: 0; }
+        p { font-size: 16px; color: rgba(255, 220, 100, 0.9); margin-top: 10px; letter-spacing: 2px; }
+
+        #water-control {
+            position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%); z-index: 20; text-align: center; display: none;
+        }
+        #water-btn {
+            background: transparent; border: 2px solid #ffcc00; border-radius: 50px;
+            color: #ffcc00; font-size: 18px; letter-spacing: 4px; padding: 15px 40px;
+            cursor: pointer; text-shadow: 0 0 10px #ffcc00; box-shadow: 0 0 20px rgba(255, 150, 0, 0.4), inset 0 0 10px rgba(255, 150, 0, 0.2);
+            transition: all 0.3s ease; outline: none; font-family: "Microsoft YaHei"; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        #water-btn:active { background: rgba(255, 150, 0, 0.3); transform: scale(0.95); box-shadow: 0 0 40px rgba(255, 150, 0, 0.8); }
+        #progress-bar-container {
+            width: 250px; height: 6px; background: rgba(255,200,0,0.1); margin-top: 15px; border-radius: 3px; overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.8);
+        }
+        #progress-bar { width: 0%; height: 100%; background: #ffcc00; box-shadow: 0 0 15px #ffaa00; transition: width 0.1s linear; }
+        .hint-text { font-size: 12px; color: #ffaa66; margin-top: 8px; letter-spacing: 1px; }
+
+        #star-repository {
+            position: fixed; top: 10%; right: 15px; bottom: 10%; width: 220px;
+            background: linear-gradient(to bottom, rgba(50, 20, 0, 0.6), rgba(20, 5, 0, 0.8), rgba(50, 20, 0, 0.6));
+            backdrop-filter: blur(10px); border-left: 1px solid rgba(255, 150, 0, 0.4); border-right: 1px solid rgba(255, 150, 0, 0.4);
+            border-radius: 20px; z-index: 80; display: flex; flex-direction: column; padding: 15px 10px; box-sizing: border-box;
+            box-shadow: 0 0 30px rgba(255, 150, 0, 0.2), inset 0 0 20px rgba(255, 150, 0, 0.2);
+            pointer-events: auto; opacity: 0; transition: opacity 2s ease; transform: translateX(50px);
+        }
+        #star-repository.visible { opacity: 1; transform: translateX(0); }
+        #repo-header {
+            font-size: 14px; color: #ffcc00; font-weight: bold; letter-spacing: 2px;
+            text-align: center; border-bottom: 1px solid rgba(255, 150, 0, 0.4); padding-bottom: 10px; margin-bottom: 10px;
+        }
+        #star-count { font-size: 28px; color: #fff; display: block; margin-top: 5px; text-shadow: 0 0 15px #ff9900;}
+        #collection-log {
+            flex-grow: 1; overflow-y: auto; color: rgba(255,230,150,0.8); font-size: 12px; line-height: 1.6; letter-spacing: 1px; padding-right: 5px;
+        }
+        #collection-log::-webkit-scrollbar { width: 2px; }
+        #collection-log::-webkit-scrollbar-thumb { background: rgba(255, 150, 0, 0.5); border-radius: 2px; }
+        .log-entry { margin-bottom: 10px; border-bottom: 1px dashed rgba(255,150,0,0.2); padding-bottom: 5px; animation: fadeInEntry 0.5s;}
+        .log-time { font-size: 10px; color: rgba(255, 150, 0, 0.7); display: block; margin-top: 2px;}
+        .spark-icon { color: #ffcc00; margin-right: 4px; text-shadow: 0 0 8px #ffcc00;}
+        @keyframes fadeInEntry { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        #achievement-popup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); width: 85%; max-width: 500px;
+            background: linear-gradient(135deg, rgba(60, 20, 0, 0.9), rgba(10, 0, 0, 0.95));
+            backdrop-filter: blur(15px); border: 1px solid rgba(255, 150, 0, 0.6); 
+            box-shadow: 0 0 80px rgba(255, 100, 0, 0.4), inset 0 0 30px rgba(255, 150, 0, 0.3);
+            padding: 35px 25px; box-sizing: border-box; border-radius: 15px; z-index: 95; 
+            opacity: 0; pointer-events: none; transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); text-align: center;
+        }
+        #achievement-popup.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+        .ach-date { font-size: 26px; color: #ffcc00; font-weight: bold; letter-spacing: 4px; margin-bottom: 10px; text-shadow: 0 0 20px #ff9900; }
+        .ach-title { font-size: 28px; color: #ffffff; font-weight: bold; letter-spacing: 6px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,200,0,0.3); padding-bottom: 15px; }
+        .ach-desc { font-size: 16px; color: rgba(255, 230, 200, 0.9); line-height: 1.8; letter-spacing: 2px; text-align: justify; }
+        .close-btn { margin-top: 25px; padding: 10px 30px; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; border-radius: 20px; cursor: pointer; font-size: 14px; letter-spacing: 2px; transition: 0.3s; }
+        .close-btn:hover { background: rgba(255, 150, 0, 0.3); box-shadow: 0 0 15px rgba(255,150,0,0.5); }
+
+        #start-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10,5,0,0.95); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; transition: opacity 1.5s;
+        }
+        .pulse-text { font-size: 18px; letter-spacing: 5px; color: #ffcc00; animation: pulse 2s infinite; margin-top: 20px; text-align: center; line-height: 1.8;}
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+        
+        #hint-top { position: absolute; top: 18%; width: 100%; text-align: center; color: #ffcc00; font-size: 15px; letter-spacing: 4px; z-index: 10; display: none; text-shadow: 0 0 15px #ff9900; animation: pulse 2s infinite; pointer-events: none;}
+
+        @media (max-width: 768px) {
+            h1 { font-size: 28px; } p { font-size: 12px; }
+            #water-btn { padding: 12px 30px; font-size: 16px; }
+            #achievement-popup { width: 90%; padding: 25px 15px; }
+            .ach-date { font-size: 20px; } .ach-title { font-size: 22px; } .ach-desc { font-size: 14px; }
+            #star-repository { width: 140px; top: 20px; right: 10px; bottom: auto; max-height: 45vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay" onclick="launch()">
+        <h1 style="font-size: 38px; letter-spacing: 12px; color: #ffaa00; text-shadow: 0 0 40px #ff6600;">胜 利</h1>
+        <div class="pulse-text">— 点击进入 —<br>浇灌革命幼苗，培育浩瀚星辰</div>
+    </div>
+
+    <div id="ui-layer">
+        <h1>胜 利</h1>
+        <p>百年宏愿，生生不息</p>
+    </div>
+    
+    <div id="hint-top" style="color: #ffaa00;">生命幼苗正在吸收星火蔓延...</div>
+
+    <div id="water-control">
+        <button id="water-btn" 
+            onmousedown="startWatering(event)" onmouseup="stopWatering(event)" onmouseleave="stopWatering(event)" 
+            ontouchstart="startWatering(event)" ontouchend="stopWatering(event)">注入星火</button>
+        <div id="progress-bar-container"><div id="progress-bar"></div></div>
+        <div class="hint-text">长按按钮，用信念浇灌生命之苗</div>
+    </div>
+
+    <div id="star-repository">
+        <div id="repo-header">胜利之火<span id="star-count">0</span></div>
+        <div id="collection-log"></div>
+    </div>
+
+    <div id="achievement-popup">
+        <div class="ach-date" id="ach-date"></div>
+        <div class="ach-title" id="ach-title"></div>
+        <div class="ach-desc" id="ach-desc"></div>
+        <button class="close-btn" onclick="closePopup()">铭 记</button>
+    </div>
+
+    <div id="webgl-container"></div>
+
+<script>
+    // 20个宏大历史成就数据库
+    const ACHIEVEMENTS_DB = [
+        { date: "1911年", title: "开天辟地：武昌首义", desc: "武昌城头的枪声，划破了封建专制的漫长黑夜。辛亥革命成功推翻了清王朝，结束了统治中国两千多年的君主专制制度。" },
+        { date: "1921年", title: "星火点燃：建党伟业", desc: "嘉兴南湖的一叶红船，点燃了共产主义的火种。中国共产党诞生，将革命接力棒稳稳接过，彻底改变了中华民族的前途命运。" },
+        { date: "1927年", title: "燎原之势：建军大业", desc: "南昌城头的枪声，井冈山上的军旗。中国共产党人通过武装革命，点燃了工农武装割据的燎原星火。" },
+        { date: "1949年", title: "改天换地：建国盛典", desc: "中华人民共和国成立，彻底推翻了三座大山，实现了辛亥革命先驱们梦寐以求的民族独立和人民解放。" },
+        { date: "1956年", title: "翻天覆地：三大改造", desc: "社会主义基本制度的确立，为中国现代化建设奠定了坚实基础，中华民族走上了实现民族复兴的康庄大道。" },
+        { date: "1964年", title: "震古烁今：两弹一星", desc: "罗布泊的巨响，挺起了共和国的脊梁。中国人民在极其困难的条件下打破了核垄断，确立了大国地位。" },
+        { date: "1978年", title: "春风浩荡：改革开放", desc: "历史性的伟大转折。确立了以经济建设为中心，解放和发展社会生产力，中国特色社会主义道路从此越走越宽广。" },
+        { date: "1997年", title: "洗雪前耻：香港回归", desc: "紫荆花开，百年期盼。香港、澳门相继回归，洗雪了中华民族百年的屈辱历史，实现了祖国和平统一的重大跨越。" },
+        { date: "2008年", title: "百年圆梦：北京奥运", desc: "同一个世界，同一个梦想。中国以包容开放的姿态，向世界展现了民族复兴的蓬勃姿态与文化自信。" },
+        { date: "2021年", title: "惊天动地：全面小康", desc: "建党百年之际，中国历史性地解决了绝对贫困问题，实现了中华民族千年夙愿，迈向了复兴新起点！" },
+        { date: "黑暗微光", title: "蛰伏之种：星星之火", desc: "最初的树苗只占画面的微小一角，如同黑暗岁月里蛰伏的微光。但只要火种不灭，生命的力量就无可阻挡。" },
+        { date: "向上繁衍", title: "无尽延伸：枝繁叶茂", desc: "每一次浇灌都是后人对理想的坚守。每一次生长，都是无数英烈用热血换来的枝繁叶茂，向着宇宙深处无尽繁衍。" },
+        { date: "浩瀚星云", title: "金耀宇宙：辉煌成就", desc: "当大树生长至覆盖整个画面，那些苦难中孕育的果实，最终化作了浩瀚宇宙般的璀璨金芒，这是几代人牺牲与奉献熔铸而成的辉煌。" },
+        { date: "众志成城", title: "同心聚力：人民史诗", desc: "这棵宇宙大树由无数微小的数据光点汇聚而成，隐喻着人民群众才是推动历史车轮、创造胜利奇迹的真正动力。" },
+        { date: "静谧星辰", title: "永恒火种：薪火相传", desc: "枝头缓缓呼吸的四芒星，不再急躁。摘下它，你便接过了革命先驱的火把。星火相传，照亮了中华民族前行的道路。" },
+        { date: "风雨同舟", title: "坚韧不拔：历久弥新", desc: "历经百年风雨洗礼，这棵历史之树不仅没有枯萎，反而愈发庞大、苍劲挺拔，彰显了中华民族百折不挠的坚韧品格。" },
+        { date: "时代华章", title: "昂首阔步：走向未来", desc: "承百代之流，会当今之变。满载着历史的硕果，今日之中国正以昂扬的姿态，阔步迈向全面建设社会主义现代化强国的新征程。" },
+        { date: "星辰大海", title: "无限探索：志在苍穹", desc: "大树的枝桠如星云般直指深邃的宇宙，象征着中华民族永不停歇的探索精神，我们的征途是浩瀚的星辰大海。" },
+        { date: "文明瑰宝", title: "光芒万丈：文化自信", desc: "这耀眼的金光也是五千年中华灿烂文明的折射。在复兴的道路上，我们以坚定的文化自信，向世界展现东方智慧。" },
+        { date: "终极宣告", title: "生生不息：千秋伟业", desc: "收集没有上限，树木已至苍穹。每一次凝结出的星火都在宣告：中华民族的伟大复兴，是不可阻挡、生生不息的历史洪流！" }
+    ];
+    let collectedStarsData = JSON.parse(localStorage.getItem('xiwang_collected_stars_game')) || [];
+    
+    let scene, camera, renderer, composer;
+    let treeGroup, treeParticles, starsGroup;
+    let waterParticles, bgDust; // ★ 增加独立背景星尘系统
+    let clock, raycaster, mouse;
+    
+    // 5段严谨状态机
+    let gameState = 0; 
+    let waterProgress = 0; 
+    let isWatering = false;
+    
+    // ★ 核心改变：蛰伏树苗开局，5阶生长！
+    let growthStage = 0;           // 当前生长阶段 0-5
+    let treeCurrentScale = 0.2;    // 初始非常迷你 (20%体积)
+    let treeTargetScale = 0.2;     
+    let treeCurrentGrowth = 0.1;   // 初始只露出一丢丢根基
+    let treeTargetGrowth = 0.1;    
+    
+    const MAX_STARS_POOL = 30; 
+    let starSpawnSpots = []; 
+
+    function init() {
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x030100, 0.001); // 极深邃背景
+
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
+        camera.position.set(0, 150, 900); 
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.getElementById('webgl-container').appendChild(renderer.domElement);
+
+        raycaster = new THREE.Raycaster();
+        raycaster.params.Points.threshold = 50; 
+        mouse = new THREE.Vector2();
+
+        // 降低泛光强度，防止后期过曝
+        const renderPass = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 1.0, 0.2);
+        composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderPass);
+        composer.addPass(bloomPass);
+
+        createBackgroundDust(); // ★ 满屏金色旋转星尘
+        createCosmicNebulaTree(); 
+        createStars();
+        createRealisticWaterParticles(); 
+
+        clock = new THREE.Clock();
+        updateRepositoryUI();
+        animate();
+
+        window.addEventListener('resize', onWindowResize, false);
+        window.addEventListener('mousedown', onMouseClick, false);
+        window.addEventListener('touchstart', onTouchClick, {passive: false});
+    }
+
+    function createParticleTexture(colorStop, isNebula = false) {
+        const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128; const ctx = canvas.getContext('2d');
+        const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+        
+        if (isNebula) {
+            grad.addColorStop(0, 'rgba(255, 220, 150, 0.8)'); // 更亮的中心
+            grad.addColorStop(0.3, colorStop);
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        } else {
+            grad.addColorStop(0, 'rgba(255,200,100,0.8)'); 
+            grad.addColorStop(0.3, colorStop); 
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+        }
+        
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, 128, 128);
+        const texture = new THREE.Texture(canvas); texture.needsUpdate = true; return texture;
+    }
+
+    function createTrueFourPointStar() {
+        const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256; const c = canvas.getContext('2d');
+        c.fillStyle = '#ffffff'; c.shadowColor = '#ffcc00'; c.shadowBlur = 30;
+        c.beginPath(); c.moveTo(128, 10); c.quadraticCurveTo(128, 128, 246, 128); c.quadraticCurveTo(128, 128, 128, 246); c.quadraticCurveTo(128, 128, 10, 128); c.quadraticCurveTo(128, 128, 128, 10); c.fill();
+        c.shadowBlur = 10; c.shadowColor = '#ffffff'; c.beginPath(); c.arc(128, 128, 8, 0, Math.PI * 2); c.fill();
+        const texture = new THREE.Texture(canvas); texture.needsUpdate = true; return texture;
+    }
+
+    // ★ 满屏金色星尘旋涡
+    function createBackgroundDust() {
+        const geo = new THREE.BufferGeometry();
+        const particleCount = 15000;
+        const pos = new Float32Array(particleCount * 3);
+        
+        for(let i=0; i<particleCount; i++) {
+            // 圆柱形旋涡散布，包裹树苗
+            let r = Math.random() * 2500 + 100;
+            let theta = Math.random() * Math.PI * 2;
+            let y = (Math.random() - 0.5) * 3500;
+            
+            pos[i*3] = Math.cos(theta) * r;
+            pos[i*3+1] = y;
+            pos[i*3+2] = Math.sin(theta) * r;
+        }
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const mat = new THREE.PointsMaterial({ 
+            size: 6, 
+            map: createParticleTexture('rgba(255, 200, 50, 0.6)', true), // 温暖的金色
+            transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.6 
+        });
+        bgDust = new THREE.Points(geo, mat);
+        scene.add(bgDust);
+    }
+
+    // 浩瀚宇宙生命树生成算法
+    function createCosmicNebulaTree() {
+        treeGroup = new THREE.Group();
+        scene.add(treeGroup);
+
+        const points = []; const colors = []; const growthAttributes = []; const isLeaf = [];
+        starSpawnSpots = []; 
+        
+        const MAX_DEPTH = 6; 
+
+        function branch(startVec, dirVec, length, depth, maxDepth) {
+            const endVec = startVec.clone().add(dirVec.clone().multiplyScalar(length));
+            const segments = Math.floor(length / 2.5); 
+            
+            for(let i=0; i<=segments; i++) {
+                let t = i/segments;
+                const pt = startVec.clone().lerp(endVec, t);
+                
+                pt.x += Math.sin(t * Math.PI) * (Math.random() - 0.5) * (30 - depth*4);
+                pt.z += Math.cos(t * Math.PI) * (Math.random() - 0.5) * (30 - depth*4);
+                
+                const radius = Math.max(1, 20 - depth * 3) * (1-t) + 1;
+                pt.x += (Math.random()-0.5)*radius; pt.y += (Math.random()-0.5)*radius; pt.z += (Math.random()-0.5)*radius;
+                
+                points.push(pt.x, pt.y, pt.z);
+                
+                colors.push(0.8 + Math.random()*0.2, 0.3 + Math.random()*0.2, 0.0); 
+                
+                let delay = (depth + t) / maxDepth; 
+                growthAttributes.push(delay); 
+                isLeaf.push(0.0); 
+            }
+
+            if (depth < maxDepth) {
+                const branches = depth === 0 ? 4 : (depth === 1 ? 3 : 2); 
+                for(let i=0; i<branches; i++) {
+                    const angleY = (Math.random() * Math.PI * 2);
+                    let angleOut = (Math.random() * 0.4 + 0.2) * (1.1 - depth*0.1); 
+                    if (depth >= maxDepth - 2) {
+                        angleOut = Math.random() * Math.PI * 0.5 + 0.2; 
+                    }
+                    
+                    const newDir = new THREE.Vector3(0, 1, 0);
+                    newDir.applyAxisAngle(new THREE.Vector3(1,0,0), angleOut);
+                    newDir.applyAxisAngle(new THREE.Vector3(0,1,0), angleY);
+                    
+                    branch(endVec, newDir, length * (0.65 + Math.random()*0.1), depth + 1, maxDepth);
+                }
+            } else {
+                for(let l=0; l<40; l++) {
+                    let spread = 150 + Math.random() * 200; 
+                    let theta = Math.random() * Math.PI * 2;
+                    let phi = Math.acos(Math.random() * 2 - 1) * 0.6; 
+                    
+                    let ox = Math.sin(phi) * Math.cos(theta) * spread;
+                    let oy = Math.cos(phi) * spread;
+                    let oz = Math.sin(phi) * Math.sin(theta) * spread;
+                    
+                    points.push(endVec.x + ox, endVec.y + oy, endVec.z + oz);
+                    colors.push(1.0, 0.6 + Math.random()*0.3, 0.05); 
+                    growthAttributes.push(0.85 + Math.random()*0.15); 
+                    isLeaf.push(1.0); 
+                }
+            }
+            
+            if (depth >= 1 && depth <= 5) {
+                starSpawnSpots.push({ pos: endVec, delayReq: depth / maxDepth });
+            }
+        }
+
+        const startPoint = new THREE.Vector3(0, -350, 0); 
+        const startDir = new THREE.Vector3(0, 1, 0);
+        branch(startPoint, startDir, 250, 0, MAX_DEPTH); 
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        geo.setAttribute('aGrowthDelay', new THREE.Float32BufferAttribute(growthAttributes, 1));
+        geo.setAttribute('aIsLeaf', new THREE.Float32BufferAttribute(isLeaf, 1));
+        
+        const mat = new THREE.ShaderMaterial({
+            uniforms: {
+                uTextureTrunk: { value: createParticleTexture('rgba(255,150,0,0.8)', false) },
+                uTextureNebula: { value: createParticleTexture('rgba(255,120,0,0.4)', true) }, 
+                uGrowthProgress: { value: treeCurrentGrowth },
+                uTime: { value: 0 },
+                uWateringIntensity: { value: 0.0 }
+            },
+            vertexShader: `
+                uniform float uGrowthProgress; uniform float uTime; uniform float uWateringIntensity;
+                attribute float aGrowthDelay; attribute vec3 color; attribute float aIsLeaf;
+                varying vec3 vColor; varying float vAlpha; varying float vIsLeaf;
+                void main() {
+                    vIsLeaf = aIsLeaf;
+                    vColor = color * 0.8 + vec3(0.5, 0.2, 0.0) * uWateringIntensity;
+                    
+                    float currentGrowth = smoothstep(aGrowthDelay, aGrowthDelay + 0.15, uGrowthProgress);
+                    
+                    float twinkle = aIsLeaf > 0.5 ? sin(uTime * 1.5 + aGrowthDelay * 20.0) : sin(uTime * 0.8 + aGrowthDelay * 10.0);
+                    
+                    float baseAlpha = aIsLeaf > 0.5 ? 0.08 : 0.4; 
+                    vAlpha = currentGrowth * (baseAlpha + 0.05 * twinkle);
+                    vAlpha += uWateringIntensity * 0.2 * currentGrowth; 
+                    
+                    vec3 newPosition = position;
+                    // 向上舒展动画
+                    newPosition.y = mix(position.y - 250.0, position.y, currentGrowth);
+                    newPosition.x = mix(position.x * 0.1, position.x, currentGrowth);
+                    newPosition.z = mix(position.z * 0.1, position.z, currentGrowth);
+                    
+                    vec4 mvPosition = modelViewMatrix * vec4(newPosition, 1.0);
+                    
+                    float baseSize = aIsLeaf > 0.5 ? 200.0 : 15.0; 
+                    gl_PointSize = mix(0.0, baseSize * currentGrowth, currentGrowth) * (1800.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D uTextureTrunk; 
+                uniform sampler2D uTextureNebula; 
+                varying vec3 vColor; varying float vAlpha; varying float vIsLeaf;
+                void main() {
+                    gl_FragColor = vec4(vColor, vAlpha);
+                    if (vIsLeaf > 0.5) {
+                        gl_FragColor = gl_FragColor * texture2D(uTextureNebula, gl_PointCoord);
+                    } else {
+                        gl_FragColor = gl_FragColor * texture2D(uTextureTrunk, gl_PointCoord);
+                    }
+                    if (gl_FragColor.a < 0.02) discard;
+                }
+            `,
+            transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        
+        treeParticles = new THREE.Points(geo, mat);
+        treeGroup.add(treeParticles);
+        
+        // 初始状态：蛰伏的幼苗
+        treeGroup.scale.set(treeCurrentScale, treeCurrentScale, treeCurrentScale);
+        treeGroup.position.y = -150;
+    }
+
+    function createStars() {
+        starsGroup = new THREE.Group();
+        scene.add(starsGroup);
+
+        const starTex = createTrueFourPointStar(); 
+
+        for(let i=0; i<MAX_STARS_POOL; i++) {
+            const mat = new THREE.SpriteMaterial({ 
+                map: starTex, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+            });
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(0, 0, 0); 
+            sprite.userData = { id: i, active: false, collected: false, flying: false, localPos: new THREE.Vector3(), startPos: new THREE.Vector3() }; 
+            starsGroup.add(sprite);
+        }
+    }
+
+    function createRealisticWaterParticles() {
+        const geo = new THREE.BufferGeometry();
+        const pos = new Float32Array(800 * 3);
+        const vel = new Float32Array(800 * 3); 
+        const life = new Float32Array(800); 
+        for(let i=0; i<800; i++) {
+            pos[i*3] = 0; pos[i*3+1] = -9999; pos[i*3+2] = 0; 
+            life[i] = 0;
+        }
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('velocity', new THREE.BufferAttribute(vel, 3));
+        geo.setAttribute('life', new THREE.BufferAttribute(life, 1));
+        
+        const mat = new THREE.PointsMaterial({
+            size: 10, map: createParticleTexture('rgba(255, 200, 50, 0.9)', false),
+            transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        waterParticles = new THREE.Points(geo, mat);
+        scene.add(waterParticles);
+    }
+
+    function startWatering(e) {
+        if(e) { if (e.type === 'touchstart') e.preventDefault(); }
+        if(gameState === 0) isWatering = true;
+    }
+    function stopWatering(e) {
+        if(e && e.type === 'touchend') e.preventDefault();
+        isWatering = false;
+    }
+
+    function onMouseClick(e) { if(gameState === 4) handleStarClick(e.clientX, e.clientY); }
+    function onTouchClick(e) { if(gameState === 4) handleStarClick(e.touches[0].clientX, e.touches[0].clientY); }
+
+    function handleStarClick(clientX, clientY) {
+        mouse.x = (clientX / window.innerWidth) * 2 - 1; 
+        mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        const intersects = raycaster.intersectObjects(starsGroup.children);
+        if (intersects.length > 0) {
+            const star = intersects[0].object;
+            if(star.userData.active && !star.userData.flying && !star.userData.collected) {
+                collectStar(star);
+            }
+        }
+    }
+
+    function collectStar(star) {
+        star.userData.active = false; 
+        star.userData.flying = true; 
+        star.userData.flyProgress = 0;
+        star.userData.startPos.copy(star.position); 
+        
+        const currentTotalCount = collectedStarsData.length;
+        const ach = ACHIEVEMENTS_DB[currentTotalCount % ACHIEVEMENTS_DB.length];
+        
+        document.getElementById('ach-date').innerText = ach.date;
+        document.getElementById('ach-title').innerText = ach.title;
+        document.getElementById('ach-desc').innerText = ach.desc;
+        document.getElementById('achievement-popup').classList.add('visible');
+    }
+
+    function closePopup() {
+        document.getElementById('achievement-popup').classList.remove('visible');
+        collectedStarsData.push({ time: formatCurrentTime() });
+        localStorage.setItem('xiwang_collected_stars_game', JSON.stringify(collectedStarsData));
+        updateRepositoryUI();
+
+        let activeOnTree = 0;
+        starsGroup.children.forEach(c => { if (c.userData.active && !c.userData.flying) activeOnTree++; });
+
+        if (activeOnTree === 0) {
+            document.getElementById('hint-top').style.display = 'none';
+            setTimeout(() => {
+                gameState = 0; 
+                waterProgress = 0;
+                document.getElementById('progress-bar').style.width = '0%';
+                document.getElementById('water-control').style.display = 'block';
+            }, 800);
+        } 
+    }
+
+    function formatCurrentTime() {
+        const now = new Date();
+        const m = String(now.getMonth() + 1).padStart(2, '0'); const d = String(now.getDate()).padStart(2, '0');
+        const h = String(now.getHours()).padStart(2, '0'); const mi = String(now.getMinutes()).padStart(2, '0');
+        return m + "-" + d + " " + h + ":" + mi;
+    }
+
+    function updateRepositoryUI() {
+        const countSpan = document.getElementById('star-count');
+        const logDiv = document.getElementById('collection-log');
+        countSpan.innerText = collectedStarsData.length;
+        logDiv.innerHTML = '';
+        for (let i = collectedStarsData.length - 1; i >= 0; i--) {
+            const entry = collectedStarsData[i]; const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry'; logEntry.innerHTML = '<span class="spark-icon">✨</span>星火入库<span class="log-time">' + entry.time + '</span>';
+            logDiv.appendChild(logEntry);
+        }
+    }
+
+    function launch() {
+        document.getElementById('start-overlay').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('start-overlay').style.display = 'none';
+            document.getElementById('water-control').style.display = 'block';
+            document.getElementById('star-repository').classList.add('visible');
+            gameState = 0; 
+            document.getElementById('hint-top').innerText = "生命幼苗正在金色星尘中蛰伏...";
+            document.getElementById('hint-top').style.color = "#ffaa00";
+            document.getElementById('hint-top').style.display = 'block';
+        }, 1000);
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+        const time = clock.getElapsedTime();
+
+        // ★ 满屏金色星尘旋涡自转
+        if(bgDust) {
+            bgDust.rotation.y -= delta * 0.08; // 与大树反向缓慢旋转
+        }
+
+        // 大树缓缓自转
+        if(treeGroup) {
+            treeGroup.rotation.y += delta * 0.12; 
+            treeGroup.position.y = -120 + Math.sin(time * 1.5) * 5; 
+            treeGroup.updateMatrixWorld(); 
+        }
+
+        // ================= 时序控制核心 =================
+        
+        // 阶段 0 & 1: 浇灌
+        if(gameState === 0 || gameState === 1) {
+            if (isWatering) gameState = 1;
+            
+            const wPos = waterParticles.geometry.attributes.position;
+            const wVel = waterParticles.geometry.attributes.velocity;
+            const wLife = waterParticles.geometry.attributes.life;
+            waterParticles.material.opacity = isWatering ? 1 : 0;
+            
+            for(let i=0; i<800; i++) {
+                if (wLife.array[i] <= 0 && isWatering) {
+                    wPos.array[i*3] = -250 + Math.random() * 80;  
+                    wPos.array[i*3+1] = -150 + Math.random() * 50; 
+                    wPos.array[i*3+2] = 250 + Math.random() * 50; 
+                    wVel.array[i*3] = 6 + Math.random() * 4; 
+                    wVel.array[i*3+1] = 10 + Math.random() * 8; 
+                    wVel.array[i*3+2] = -5 - Math.random() * 3; 
+                    wLife.array[i] = 1.0;
+                }
+                if (wLife.array[i] > 0) {
+                    wPos.array[i*3] += wVel.array[i*3];
+                    wPos.array[i*3+1] += wVel.array[i*3+1];
+                    wPos.array[i*3+2] += wVel.array[i*3+2];
+                    wVel.array[i*3+1] -= 0.4; 
+                    wLife.array[i] -= 0.015; 
+                    if(wPos.array[i*3+1] < -400) wLife.array[i] = 0;
+                } else {
+                    wPos.array[i*3+1] = -9999; 
+                }
+            }
+            wPos.needsUpdate = true;
+
+            if(isWatering) {
+                waterProgress += delta * 45; 
+                if(waterProgress >= 100) {
+                    waterProgress = 100;
+                    isWatering = false;
+                    
+                    // ★ 5阶段宇宙膨胀算法 ★
+                    if (growthStage < 5) growthStage++;
+                    
+                    // 动态计算目标：从小树苗(0.2)长到宇宙巨树(1.6)
+                    treeTargetGrowth = 0.1 + (growthStage * 0.18); 
+                    treeTargetScale = 0.2 + (growthStage * 0.28); 
+                    
+                    gameState = 2; // 树枝向上繁衍中
+                    
+                    document.getElementById('water-control').style.display = 'none';
+                    document.getElementById('hint-top').innerText = "大树正在向宇宙深处生长蔓延...";
+                    document.getElementById('hint-top').style.color = "#ffaa00";
+                    document.getElementById('hint-top').style.display = 'block';
+                }
+                document.getElementById('progress-bar').style.width = waterProgress + '%';
+            } else if (gameState === 1 && !isWatering) {
+                if(waterProgress > 0) waterProgress -= delta * 15;
+                if(waterProgress <= 0) { waterProgress = 0; gameState = 0; }
+                document.getElementById('progress-bar').style.width = Math.max(0, waterProgress) + '%';
+            }
+            
+            if(treeParticles) {
+                let targetIntensity = isWatering ? 1.0 : 0.0;
+                treeParticles.material.uniforms.uWateringIntensity.value += (targetIntensity - treeParticles.material.uniforms.uWateringIntensity.value) * 0.1;
+                treeParticles.material.uniforms.uTime.value = time;
+            }
+        }
+
+        // 阶段 2: 大树向上繁衍生长中
+        if(gameState === 2) {
+            treeCurrentScale += (treeTargetScale - treeCurrentScale) * (delta * 1.5);
+            treeCurrentGrowth += (treeTargetGrowth - treeCurrentGrowth) * (delta * 1.5);
+            
+            treeGroup.scale.set(treeCurrentScale, treeCurrentScale, treeCurrentScale);
+            
+            if(treeParticles) {
+                treeParticles.material.uniforms.uGrowthProgress.value = treeCurrentGrowth;
+                treeParticles.material.uniforms.uTime.value = time;
+                treeParticles.material.uniforms.uWateringIntensity.value += (0.0 - treeParticles.material.uniforms.uWateringIntensity.value) * 0.05;
+            }
+
+            if (Math.abs(treeTargetGrowth - treeCurrentGrowth) < 0.01) {
+                treeCurrentGrowth = treeTargetGrowth;
+                
+                // 1-3 颗星火凝结
+                let numStarsToSpawn = Math.floor(Math.random() * 3) + 1;
+                let idleStars = starsGroup.children.filter(c => !c.userData.active && !c.userData.collected && !c.userData.flying);
+                let actualSpawnCount = Math.min(numStarsToSpawn, idleStars.length);
+                
+                // 根据当前生长阶段筛选能长出星星的末端
+                let validSpots = starSpawnSpots.filter(spot => spot.delayReq <= treeTargetGrowth + 0.1);
+                if(validSpots.length === 0) validSpots = starSpawnSpots; 
+                
+                const shuffledEnds = validSpots.sort(() => 0.5 - Math.random());
+                
+                for(let i=0; i<actualSpawnCount; i++) {
+                    let star = idleStars[i];
+                    star.userData.active = true;
+                    star.scale.set(0,0,0);
+                    star.userData.localPos = shuffledEnds[i].pos.clone();
+                }
+
+                gameState = 3; 
+                document.getElementById('hint-top').innerText = "胜利硕果正在枝端凝结...";
+            }
+        }
+
+        // 阶段 3 & 4: 星火凝结、极慢闪烁与收集
+        let allStarsFullyGrown = true;
+        let activeStarsCount = 0;
+        
+        starsGroup.children.forEach((star, i) => {
+            if (star.userData.active) {
+                activeStarsCount++;
+                
+                let worldPos = star.userData.localPos.clone().applyMatrix4(treeGroup.matrixWorld);
+                let normal = worldPos.clone().normalize();
+                star.position.copy(worldPos.add(normal.multiplyScalar(25))); 
+
+                if (gameState === 3) {
+                    if (star.scale.x < 45) { 
+                        star.scale.x += delta * 60; 
+                        star.scale.set(star.scale.x, star.scale.x, star.scale.x);
+                        allGrownThisRound = false;
+                    } else {
+                        const baseScale = 45;
+                        const pulse = baseScale + Math.sin(time * 1.5 + i) * 6; 
+                        star.scale.set(pulse, pulse, pulse);
+                    }
+                } else if (gameState === 4) {
+                    const baseScale = 45;
+                    const pulse = baseScale + Math.sin(time * 1.5 + i) * 6; 
+                    star.scale.set(pulse, pulse, pulse);
+                }
+            } 
+            else if (star.userData.flying) {
+                star.userData.flyProgress += delta * 1.5; 
+                if (star.userData.flyProgress >= 1.0) {
+                    star.userData.flyProgress = 1.0;
+                    star.userData.flying = false;
+                    star.userData.collected = false; 
+                    star.scale.set(0,0,0); 
+                } else {
+                    let t = star.userData.flyProgress;
+                    let easeT = t * t * (3 - 2 * t);
+                    
+                    let targetWorldX = 650;
+                    let targetWorldY = 350;
+                    
+                    star.position.x = star.userData.startPos.x * (1 - easeT) + targetWorldX * easeT;
+                    star.position.y = star.userData.startPos.y * (1 - easeT) + targetWorldY * easeT;
+                    star.position.z = star.userData.startPos.z * (1 - easeT) - 200 * easeT; 
+                    
+                    let s = 45 * (1 - easeT);
+                    star.scale.set(s, s, s);
+                    star.material.color.lerp(new THREE.Color(0xffffff), 0.1); 
+                }
+            }
+        });
+
+        if (gameState === 3) {
+            let stillGrowing = false;
+            starsGroup.children.forEach(s => { if(s.userData.active && s.scale.x < 45) stillGrowing = true; });
+            
+            if (!stillGrowing && activeStarsCount > 0) {
+                gameState = 4; 
+                document.getElementById('hint-top').innerText = "胜利果实已凝结，请点击收集历史星火";
+                document.getElementById('hint-top').style.color = "#00ffcc";
+            }
+        }
+
+        if (gameState !== 0 && gameState !== 1 && treeParticles) {
+            treeParticles.material.uniforms.uTime.value = time;
+        }
+
+        composer.render();
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
